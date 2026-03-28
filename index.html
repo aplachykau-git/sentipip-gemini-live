@@ -103,25 +103,30 @@
     <script>
 
         const COLOR_MAP = {
-            // Emotional tone - Red
-            'Anger': '#FF3B30',
-            'Joy': '#FF3B30',
-            'Sarcasm': '#FF3B30',
-            'Excitement': '#FF3B30',
-            // Physical characteristics - Green
-            'Whispering': '#34C759',
-            'Shouting': '#34C759',
-            'Breathless': '#34C759',
-            'Fast-paced': '#34C759',
-            // Linguistic nuances - Orange
-            'Slang': '#FF9500',
-            'Technical': '#FF9500',
-            'Laughter': '#FF9500',
-            'Joke': '#FF9500',
-            'Self-correction': '#FF9500',
-            // Default - Blue
-            'Default': '#007AFF',
-            'Neutral': '#007AFF'
+            'Anger': '#FF0000',           // Pure Red
+            'Joy': '#FFD700',             // Gold
+            'Joyful': '#F0E68C',          // Khaki
+            'Sarcasm': '#8A2BE2',         // BlueViolet
+            'Excitement': '#FF4500',      // OrangeRed
+            'Whispering': '#00CED1',      // DarkTurquoise
+            'Shouting': '#FF1493',        // DeepPink
+            'Breathless': '#20B2AA',      // LightSeaGreen
+            'Fast-paced': '#FF8C00',      // DarkOrange
+            'Slang': '#32CD32',           // LimeGreen
+            'Technical': '#4682B4',       // SteelBlue
+            'Laughter': '#FF69B4',        // HotPink
+            'Joke': '#FFA500',            // Orange
+            'Self-correction': '#8B4513', // SaddleBrown
+            'Calmist': '#ADD8E6',         // LightBlue
+            'Calm': '#87CEEB',            // SkyBlue
+            'Curiosity': '#9370DB',       // MediumPurple
+            'Query': '#00BFFF',           // DeepSkyBlue
+            'Uncertainty': '#BDB76B',     // DarkKhaki
+            'Distress': '#8B0000',        // DarkRed
+            'Hesitation': '#D8BFD8',      // Thistle
+            'Emphasis': '#DC143C',        // Crimson
+            'Default': '#808080',         // Gray
+            'Neutral': '#A9A9A9'          // DarkGray
         };
 
         const startBtn = document.getElementById('start-btn');
@@ -344,9 +349,9 @@
         
         TASK:
         1. Translate audio to Polish and English: [Polish | English].
-        2. Detect Emotional Tone (e.g., [Anger], [Joy], [Sarcasm]).
-        3. Detect Physical Characteristics (e.g., [Whispering], [Shouting], [Fast-paced], [Breathless]).
-        4. Detect Linguistic Nuances (e.g., [Slang], [Technical], [Self-correction], [Joke]).
+        2. Detect Emotional Tone (e.g., [Anger], [Joy], [Joyful], [Sarcasm], [Distress], [Calm], [Calmist], [Curiosity], [Uncertainty]).
+        3. Detect Physical Characteristics (e.g., [Whispering], [Shouting], [Fast-paced], [Breathless], [Hesitation]).
+        4. Detect Linguistic Nuances (e.g., [Slang], [Technical], [Self-correction], [Joke], [Query], [Emphasis]).
         
         RULES:
         - Output Format: [Tag] Polish | English.
@@ -398,8 +403,10 @@
 
                         if (cleanText !== lastNotifiedText && (isSentenceComplete || isSubstantial)) {
                             const currentTag = tagMatch ? tagMatch[1] : 'Neutral';
-
-                            currentTagColor = COLOR_MAP[currentTag] || COLOR_MAP['Default'];
+                            
+                            // Make lookup case-insensitive
+                            const matchingKey = Object.keys(COLOR_MAP).find(k => k.toLowerCase() === currentTag.toLowerCase());
+                            currentTagColor = matchingKey ? COLOR_MAP[matchingKey] : COLOR_MAP['Default'];
                             notifyDevice(currentTag, currentTag);
                             lastNotifiedText = cleanText;
                         }
