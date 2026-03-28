@@ -365,9 +365,9 @@
         
         TASK:
         1. Translate audio to Polish and English: [Polish | English].
-        2. Detect Emotional Tone (e.g., [Anger], [Joy], [Joyful], [Sarcasm], [Distress], [Calm], [Calmist], [Curiosity], [Uncertainty], [Relief], [Disappointed], [Relaxed], [Sadness], [Anxiety], [Fear], [Concern], [Confusion]).
-        3. Detect Physical Characteristics (e.g., [Whispering], [Shouting], [Fast-paced], [Breathless], [Hesitation], [Direct], [Determination]).
-        4. Detect Cognitive & Linguistic Nuances (e.g., [Slang], [Technical], [Self-correction], [Joke], [Query], [Emphasis], [Thoughtful], [Information], [Observation], [Realization], [Analysis], [Politeness]).
+        2. Detect Emotional Tone (e.g., [Anger], [Joy], [Joyful] etc.).
+        3. Detect Physical Characteristics (e.g., [Whispering], [Shouting], [Fast-paced] etc.).
+        4. Detect Cognitive & Linguistic Nuances (e.g., [Slang], [Technical], [Self-correction], etc.).
         
         RULES:
         - Output Format: [Tag] Polish | English.
@@ -400,7 +400,7 @@
 
                         // Local device notification logic
                         const tagMatch = currentText.match(/\[(.*?)\]/);
-                        
+
                         // Clean text for PiP and chunks (don't collapse newlines entirely here)
                         const cleanText = currentText.replace(/\[.*?\]/g, '').trim();
 
@@ -419,7 +419,7 @@
 
                         if (cleanText !== lastNotifiedText && (isSentenceComplete || isSubstantial)) {
                             const currentTag = tagMatch ? tagMatch[1] : 'Neutral';
-                            
+
                             // Make lookup case-insensitive
                             const matchingKey = Object.keys(COLOR_MAP).find(k => k.toLowerCase() === currentTag.toLowerCase());
                             currentTagColor = matchingKey ? COLOR_MAP[matchingKey] : COLOR_MAP['Default'];
