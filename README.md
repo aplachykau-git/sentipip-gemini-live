@@ -10,6 +10,7 @@ A browser-based live subtitle application that streams audio via microphone to t
 - **Multilingual Speech Detection:** You can speak in any language or switch between multiple languages on the fly, and the system will automatically detect and translate them without requiring manual configuration.
 - **Dynamic PiP Display:** Shows subtitles in a floating Picture-in-Picture window, broken down into readable chunks for long sentences.
 - **Emotion & Tone Tagging:** The model attaches emotional metadata to the speech (e.g., `[Anger]`, `[Whispering]`, `[Slang]`).
+- **Lightning-Fast Response:** Leverages the Gemini Multimodal Live API via WebSocket to provide ultra-low latency, real-time feedback.
 - **Hardware Integration:** Forwards emotional tags to a local hardware device (like Ulzani TC 0001) for ambient LED color syncing.
 
 ## Architecture
