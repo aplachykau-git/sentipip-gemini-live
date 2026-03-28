@@ -157,6 +157,32 @@
             box-shadow: none !important;
         }
 
+        .settings {
+            margin-top: 30px;
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #pip-theme {
+            background: rgba(24, 24, 27, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 1rem;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        #pip-theme:hover, #pip-theme:focus {
+            border-color: var(--accent);
+        }
+
         /* Hidden elements used for PiP stream generation */
         #canvas-source, #pip-video {
             display: none;

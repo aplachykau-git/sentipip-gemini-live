@@ -46,6 +46,7 @@ const COLOR_MAP = {
         const statusEl = document.getElementById('status');
         const displayEl = document.getElementById('subtitles-display');
         const tagEl = document.getElementById('emotion-tag');
+        const themeSelect = document.getElementById('pip-theme');
         const canvas = document.getElementById('canvas-source');
         const ctx = canvas.getContext('2d');
         const video = document.getElementById('pip-video');
@@ -171,9 +172,11 @@ const COLOR_MAP = {
          */
         function drawCanvas() {
             if (!isStarted) return;
+            
+            const isBlackTheme = themeSelect && themeSelect.value === 'black';
 
-            // 1. Fill the entire canvas with WHITE background
-            ctx.fillStyle = "white";
+            // 1. Fill the entire canvas with the selected background
+            ctx.fillStyle = isBlackTheme ? "black" : "white";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             if (!pipPlText && !pipEnText) {
@@ -205,8 +208,8 @@ const COLOR_MAP = {
             const boxY = (canvas.height - boxHeight) / 2;
 
             try {
-                // 4. Draw the black background box
-                ctx.fillStyle = "black";
+                // 4. Draw the background box
+                ctx.fillStyle = isBlackTheme ? "#1c1c1e" : "black";
                 ctx.beginPath();
                 const safeRadius = Math.min(20, boxWidth / 2, boxHeight / 2);
                 ctx.roundRect(boxX, boxY, boxWidth, boxHeight, safeRadius);
