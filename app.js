@@ -47,6 +47,15 @@ const COLOR_MAP = {
         const displayEl = document.getElementById('subtitles-display');
         const tagEl = document.getElementById('emotion-tag');
         const themeSelect = document.getElementById('pip-theme');
+        
+        // Initialize UI theme based on dropdown
+        if (themeSelect) {
+            document.body.setAttribute('data-theme', themeSelect.value);
+            themeSelect.addEventListener('change', () => {
+                document.body.setAttribute('data-theme', themeSelect.value);
+            });
+        }
+
         const canvas = document.getElementById('canvas-source');
         const ctx = canvas.getContext('2d');
         const video = document.getElementById('pip-video');
