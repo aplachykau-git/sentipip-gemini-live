@@ -1,0 +1,163 @@
+:root {
+            --bg: #09090b;
+            --surface: #18181b;
+            --surface-hover: #27272a;
+            --text: #f4f4f5;
+            --text-muted: #a1a1aa;
+        }
+
+        body {
+            font-family: 'Outfit', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .glow-blob {
+            position: absolute;
+            width: 70vw;
+            height: 70vw;
+            max-width: 800px;
+            max-height: 800px;
+            background: radial-gradient(circle, rgba(59,130,246,0.1) 0%, rgba(9,9,11,0) 65%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .container {
+            z-index: 1;
+            text-align: center;
+            width: 90%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1.logo {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin: 0 0 5px 0;
+            background: linear-gradient(135deg, #60a5fa, #a855f7);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+        }
+
+        #status {
+            font-size: 1rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        #subtitles-display {
+            width: 100%;
+            margin: 0 0 15px 0;
+            padding: 30px 40px;
+            background: rgba(24, 24, 27, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            min-height: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 500;
+            line-height: 1.4;
+            transition: all 0.3s ease;
+            white-space: pre-wrap;
+            color: #ffffff;
+        }
+
+        #subtitles-display:empty {
+            display: none;
+        }
+
+        #emotion-tag {
+            font-size: 1.4rem;
+            font-weight: 700;
+            padding: 10px 30px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid transparent;
+            border-radius: 50px;
+            margin-bottom: 40px;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            opacity: 0;
+            transform: translateY(-10px) scale(0.95);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        #emotion-tag.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        button {
+            padding: 18px 40px;
+            border-radius: 100px;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 1.2rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        #start-btn {
+            background: linear-gradient(135deg, #2563eb, #4f46e5);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        #start-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4);
+        }
+
+        #pip-btn {
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        #pip-btn:hover:not(:disabled) {
+            background: var(--surface-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        /* Hidden elements used for PiP stream generation */
+        #canvas-source, #pip-video {
+            display: none;
+        }

@@ -1,0 +1,396 @@
+const COLOR_MAP = {
+            'Anger': '#FF0000',           // Pure Red
+            'Joy': '#FFD700',             // Gold
+            'Joyful': '#F0E68C',          // Khaki
+            'Sarcasm': '#8A2BE2',         // BlueViolet
+            'Excitement': '#FF4500',      // OrangeRed
+            'Whispering': '#00CED1',      // DarkTurquoise
+            'Shouting': '#FF1493',        // DeepPink
+            'Breathless': '#20B2AA',      // LightSeaGreen
+            'Fast-paced': '#FF8C00',      // DarkOrange
+            'Slang': '#32CD32',           // LimeGreen
+            'Technical': '#4682B4',       // SteelBlue
+            'Laughter': '#FF69B4',        // HotPink
+            'Joke': '#FFA500',            // Orange
+            'Self-correction': '#8B4513', // SaddleBrown
+            'Calmist': '#ADD8E6',         // LightBlue
+            'Calm': '#87CEEB',            // SkyBlue
+            'Curiosity': '#9370DB',       // MediumPurple
+            'Query': '#00BFFF',           // DeepSkyBlue
+            'Uncertainty': '#BDB76B',     // DarkKhaki
+            'Distress': '#8B0000',        // DarkRed
+            'Hesitation': '#D8BFD8',      // Thistle
+            'Emphasis': '#DC143C',        // Crimson
+            'Relief': '#2E8B57',          // SeaGreen
+            'Disappointed': '#708090',    // SlateGray
+            'Relaxed': '#98FB98',         // PaleGreen
+            'Sadness': '#00008B',         // DarkBlue
+            'Anxiety': '#FF7F50',         // Coral
+            'Fear': '#4B0082',            // Indigo
+            'Concern': '#D2691E',         // Chocolate
+            'Confusion': '#BA55D3',       // MediumOrchid
+            'Thoughtful': '#483D8B',      // DarkSlateBlue
+            'Information': '#1E90FF',     // DodgerBlue
+            'Observation': '#5F9EA0',     // CadetBlue
+            'Realization': '#FFDAB9',     // PeachPuff
+            'Analysis': '#40E0D0',        // Turquoise
+            'Politeness': '#FFB6C1',      // LightPink
+            'Direct': '#00FA9A',          // MediumSpringGreen
+            'Determination': '#B22222',   // FireBrick
+            'Default': '#808080',         // Gray
+            'Neutral': '#A9A9A9'          // DarkGray
+        };
+
+        const startBtn = document.getElementById('start-btn');
+        const pipBtn = document.getElementById('pip-btn');
+        const statusEl = document.getElementById('status');
+        const displayEl = document.getElementById('subtitles-display');
+        const tagEl = document.getElementById('emotion-tag');
+        const canvas = document.getElementById('canvas-source');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('pip-video');
+
+        let currentText = "";
+        let currentTagColor = '#007AFF';
+        let displayTimeout = null;
+        let lastNotifiedText = "";
+        let socket = null;
+        let audioContext = null;
+        let isStarted = false;
+
+        // Chunk queue system for PiP
+        let plChunks = [];
+        let enChunks = [];
+        let chunkIndex = 0;
+        let chunkTimer = null;
+        const CHUNK_DURATION_MS = 3000; // ms per chunk
+
+        // Displayed in PiP right now
+        let pipPlText = "";
+        let pipEnText = "";
+
+        /**
+         * Split a long text string into an array of chunks that each fit within maxPx pixels.
+         * ctx and font must already be set before calling.
+         */
+        function splitIntoChunks(text, maxPx) {
+            if (!text || !text.trim()) return [];
+            const safe = text.replace(/[\r\n]+/g, ' ').trim();
+            const words = safe.split(/\s+/);
+            const chunks = [];
+            let current = "";
+            for (const w of words) {
+                const test = current ? current + " " + w : w;
+                if (ctx.measureText(test).width > maxPx) {
+                    if (current) chunks.push(current);
+                    current = w;
+                } else {
+                    current = test;
+                }
+            }
+            if (current) chunks.push(current);
+            return chunks;
+        }
+
+        /**
+         * Rebuild chunk arrays from the latest full plText/enText and restart the queue timer.
+         */
+        function rebuildAndScheduleChunks(plFull, enFull) {
+            const fontSize = 48;
+            ctx.font = `bold ${fontSize}px sans-serif`;
+            const paddingH = 40;
+            const maxPx = canvas.width - (paddingH * 2) - 20;
+
+            const newPl = splitIntoChunks(plFull, maxPx);
+            const newEn = splitIntoChunks(enFull, maxPx);
+            const maxLen = Math.max(newPl.length, newEn.length, 1);
+
+            plChunks = newPl.concat(Array(maxLen - newPl.length).fill(""));
+            enChunks = newEn.concat(Array(maxLen - newEn.length).fill(""));
+
+            if (chunkTimer === null) {
+                // No timer running — start fresh from the beginning
+                chunkIndex = 0;
+                pipPlText = plChunks[0] || "";
+                pipEnText = enChunks[0] || "";
+                chunkTimer = setInterval(advanceChunk, CHUNK_DURATION_MS);
+            }
+            // If timer IS running, the arrays have been silently updated.
+            // advanceChunk will naturally walk into the new entries on the next tick.
+        }
+
+        function advanceChunk() {
+            if (plChunks.length === 0 && enChunks.length === 0) return;
+            const total = Math.max(plChunks.length, enChunks.length, 1);
+            const nextIndex = chunkIndex + 1;
+
+            if (nextIndex >= total) {
+                // We've reached the last chunk — stop cycling and hold for 3s then clear
+                clearInterval(chunkTimer);
+                chunkTimer = null;
+                setTimeout(() => {
+                    pipPlText = "";
+                    pipEnText = "";
+                }, 3000);
+            } else {
+                chunkIndex = nextIndex;
+                pipPlText = plChunks[chunkIndex] || "";
+                pipEnText = enChunks[chunkIndex] || "";
+            }
+        }
+
+        function stopChunkTimer() {
+            if (chunkTimer) { clearInterval(chunkTimer); chunkTimer = null; }
+            plChunks = []; enChunks = []; chunkIndex = 0;
+            pipPlText = ""; pipEnText = "";
+        }
+
+        /**
+         * Sends data to the local Ulzani TC 0001 device
+         */
+        async function notifyDevice(text, tag = 'Default') {
+            const color = COLOR_MAP[tag] || COLOR_MAP['Default'];
+            try {
+                await fetch(`http://${CONFIG.DEVICE_IP}/api/notify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: text.trim(),
+                        color: color,
+                        duration: 4
+                    })
+                });
+            } catch (e) {
+                console.warn("Device notification failed:", e);
+            }
+        }
+
+        /**
+         * Renders the subtitles onto the canvas for the PiP stream.
+         * Features a white background with a black "pill" box behind the text.
+         */
+        function drawCanvas() {
+            if (!isStarted) return;
+
+            // 1. Fill the entire canvas with WHITE background
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (!pipPlText && !pipEnText) {
+                requestAnimationFrame(drawCanvas);
+                return;
+            }
+
+            // 2. Text styling
+            const fontSize = 48;
+            ctx.font = `bold ${fontSize}px sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            const paddingH = 40;
+            const paddingV = 20;
+            const lineSpacing = 10;
+
+            const showPl = pipPlText || " ";
+            const showEn = pipEnText || " ";
+
+            // 3. Calculate background box
+            const metricsPl = ctx.measureText(showPl);
+            const metricsEn = ctx.measureText(showEn);
+            const maxWidth = Math.max(metricsPl.width, metricsEn.width);
+
+            const boxWidth = maxWidth + (paddingH * 2);
+            const boxHeight = (fontSize * 2) + lineSpacing + (paddingV * 2);
+            const boxX = (canvas.width - boxWidth) / 2;
+            const boxY = (canvas.height - boxHeight) / 2;
+
+            try {
+                // 4. Draw the black background box
+                ctx.fillStyle = "black";
+                ctx.beginPath();
+                const safeRadius = Math.min(20, boxWidth / 2, boxHeight / 2);
+                ctx.roundRect(boxX, boxY, boxWidth, boxHeight, safeRadius);
+                ctx.fill();
+
+                // Colored border based on tag
+                ctx.strokeStyle = currentTagColor;
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                // 5. Draw text — Polish (pale pink) on top, English (white) below
+                ctx.fillStyle = "#FFB6C1";
+                ctx.fillText(showPl, canvas.width / 2, boxY + paddingV + (fontSize / 2));
+
+                ctx.fillStyle = "white";
+                ctx.fillText(showEn, canvas.width / 2, boxY + paddingV + fontSize + lineSpacing + (fontSize / 2));
+            } catch (e) {
+                console.error("Canvas draw error:", e);
+            }
+
+            requestAnimationFrame(drawCanvas);
+        }
+
+        startBtn.onclick = async () => {
+            if (isStarted) { location.reload(); return; }
+
+            try {
+                // Request microphone access
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                isStarted = true;
+                startBtn.innerText = "Stop Session";
+
+                // Route canvas stream to hidden video element for PiP
+                video.srcObject = canvas.captureStream();
+                drawCanvas();
+                video.play();
+
+                // Initialize Gemini Live WebSocket
+                const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${CONFIG.API_KEY}`;
+                socket = new WebSocket(url);
+
+                socket.onopen = () => {
+                    statusEl.innerText = "CONNECTED";
+                    pipBtn.disabled = false;
+
+                    // Send initial model configuration
+                    socket.send(JSON.stringify({
+                        setup: {
+                            model: "models/gemini-3.1-flash-live-preview",
+                            system_instruction: {
+                                parts: [{
+                                    text: `You are an expert AI interpreter for a live subtitle feed.
+        
+        TASK:
+        1. Translate audio to Polish and English: [Polish | English].
+        2. Detect Emotional Tone (e.g., [Anger], [Joy], [Joyful] etc.).
+        3. Detect Physical Characteristics (e.g., [Whispering], [Shouting], [Fast-paced] etc.).
+        4. Detect Cognitive & Linguistic Nuances (e.g., [Slang], [Technical], [Self-correction], etc.).
+        
+        RULES:
+        - Output Format: [Tag] Polish | English.
+        - ALWAYS start with a [Tag] if it is not neutral.
+        - Use ONLY ONE most relevant tag.
+        - Keep translations very concise.
+        - Tags must be in English for the parser.`
+                                }]
+                            },
+                            generation_config: { response_modalities: ["AUDIO"] },
+                            input_audio_transcription: {},
+                            output_audio_transcription: {}
+                        }
+                    }));
+                    startAudioStreaming(stream);
+                };
+
+                socket.onmessage = async (event) => {
+                    const data = JSON.parse(event.data instanceof Blob ? await event.data.text() : event.data);
+                    const outputTranscript = data.serverContent?.outputTranscription || data.server_content?.output_transcription;
+
+                    if (outputTranscript?.text) {
+                        currentText += outputTranscript.text;
+
+                        // Strip ALL [Tag] patterns before displaying to the user
+                        // We also replace the '|' delimiter with a newline so it displays on two lines in the main UI
+                        let displayText = currentText.replace(/\[.*?\]/g, '').trim();
+                        displayText = displayText.replace(/\s*\|\s*/g, '\n');
+                        displayEl.innerText = displayText;
+
+                        // Local device notification logic
+                        const tagMatch = currentText.match(/\[(.*?)\]/);
+
+                        // Clean text for PiP and chunks (don't collapse newlines entirely here)
+                        const cleanText = currentText.replace(/\[.*?\]/g, '').trim();
+
+                        // Extract Polish and English based on the '|' or newline delimiter if it missed the pipe
+                        const parts = cleanText.split(/\||\n/);
+                        const plFull = parts[0] ? parts[0].trim() : '';
+                        const enFull = parts.slice(1).join(' ').trim();
+
+
+                        // Feed the chunk queue system for PiP
+                        rebuildAndScheduleChunks(plFull, enFull);
+
+                        // We notify if we have a significant chunk of new text or a sentence end
+                        const isSentenceComplete = /[.!?]$/.test(cleanText);
+                        const isSubstantial = cleanText.length > 20 && cleanText.length % 40 === 0;
+
+                        if (cleanText !== lastNotifiedText && (isSentenceComplete || isSubstantial)) {
+                            const currentTag = tagMatch ? tagMatch[1] : 'Neutral';
+
+                            // Make lookup case-insensitive
+                            const matchingKey = Object.keys(COLOR_MAP).find(k => k.toLowerCase() === currentTag.toLowerCase());
+                            currentTagColor = matchingKey ? COLOR_MAP[matchingKey] : COLOR_MAP['Default'];
+                            
+                            // Update the main UI Emotion Tag
+                            tagEl.innerText = `${currentTag}`;
+                            tagEl.style.color = currentTagColor;
+                            tagEl.style.borderColor = currentTagColor;
+                            tagEl.style.boxShadow = `0 0 25px ${currentTagColor}50`;
+                            tagEl.classList.add('visible');
+
+                            notifyDevice(currentTag, currentTag);
+                            lastNotifiedText = cleanText;
+                        }
+
+                        // Clear text buffer after 4 seconds of inactivity.
+                        // NOTE: do NOT stop the chunk queue here — let it finish cycling naturally.
+                        if (displayTimeout) clearTimeout(displayTimeout);
+                        displayTimeout = setTimeout(() => {
+                            currentText = "";
+                            displayEl.innerText = "";
+                            tagEl.classList.remove('visible');
+                            currentTagColor = '#007AFF';
+                            lastNotifiedText = "";
+                        }, 4000);
+
+                        // Hard reset if buffer grows too large
+                        if (currentText.length > 600) {
+                            currentText = "";
+                            lastNotifiedText = "";
+                            stopChunkTimer();
+                        }
+                    }
+                };
+            } catch (e) {
+                console.error(e);
+                statusEl.innerText = "ERROR: CHECK CONSOLE";
+            }
+        };
+
+        /**
+         * Captures audio from mic and sends PCM chunks to the WebSocket
+         */
+        function startAudioStreaming(stream) {
+            audioContext = new AudioContext({ sampleRate: 16000 });
+            const source = audioContext.createMediaStreamSource(stream);
+            const processor = audioContext.createScriptProcessor(2048, 1, 1);
+
+            source.connect(processor);
+            processor.connect(audioContext.destination);
+
+            processor.onaudioprocess = (e) => {
+                if (!socket || socket.readyState !== 1) return;
+
+                const inputData = e.inputBuffer.getChannelData(0);
+                const pcm16 = new Int16Array(inputData.length);
+
+                // Convert Float32 to Int16 for Gemini
+                for (let i = 0; i < inputData.length; i++) {
+                    const s = Math.max(-1, Math.min(1, inputData[i]));
+                    pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                }
+
+                // Send as Base64 JSON
+                socket.send(JSON.stringify({
+                    realtime_input: {
+                        audio: {
+                            mime_type: "audio/pcm;rate=16000",
+                            data: btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)))
+                        }
+                    }
+                }));
+            };
+        }
+
+        // Trigger the browser's Picture-in-Picture mode
+        pipBtn.onclick = () => video.requestPictureInPicture();
