@@ -3,7 +3,7 @@
 
 > ⚠️ **Disclaimer:** This README is AI-generated. The project itself was quickly crafted (vibecoded) during the **Software Mansion x Gemini** hackathon.
 
-A browser-based live subtitle application that streams audio via microphone to the Gemini Multimodal Live API for real-time translation and emotional tagging. It provides bilingual [PL+EN] Picture-in-Picture (PiP) subtitles and forwards emotional tone data to a local hardware companion device.
+A browser-based live subtitle application that streams audio via microphone to the Gemini Multimodal Live API for real-time translation and emotional tagging. Powered by the modern **gemini-3.1-flash-live-preview** model (as of 28.03.2026), it provides bilingual [PL+EN] Picture-in-Picture (PiP) subtitles and forwards emotional tone data to a local hardware companion device.
 
 ## Features
 - **Bilingual Subtitles:** Detects and translates audio to Polish and English simultaneously.
