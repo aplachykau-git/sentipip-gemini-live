@@ -1,6 +1,8 @@
 # SentiPiP 
 **(Sentiment Captions in picture in picture mode)**
 
+📊 [Slide Deck](https://docs.google.com/presentation/d/1oWTQgHHrihAcC9z6wssfV0UNLsILl5PivRBes3aJJaM/edit?usp=sharing) · 🎬 [Demo Video](https://www.youtube.com/watch?v=Ejed2EYRLs4)
+
 A browser-based live subtitle application that streams audio via microphone to the Gemini Multimodal Live API for real-time translation and emotional tagging, it provides bilingual [PL+EN] Picture-in-Picture (PiP) subtitles and forwards emotional tone data to a local hardware companion device.
 
 ## Features
