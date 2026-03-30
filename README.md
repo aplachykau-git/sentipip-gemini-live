@@ -29,7 +29,7 @@ A browser-based live subtitle application that streams audio via microphone to t
    To use the PiP feature effectively, make sure you install a **Picture-in-Picture extension** in Google Chrome (or use the built-in browser PiP functionality).
 
 3. **External Hardware Setup (Optional):**
-   To sync emotions with an external LED metric display/clock (e.g. Ulanzi TC0001):
+   To sync emotions with an external LED metric display/clock (Ulanzi TC001):
    - Flash the device with the [AWTRIX 3 firmware](https://blueforcer.github.io/awtrix3/#/).
    - Ensure the UI device (your laptop) and the hardware display are connected to the **same local area network** (e.g., a mobile hotspot).
    - Update `DEVICE_IP` in `index.html` to match your hardware's local IP address.
