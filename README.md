@@ -1,15 +1,13 @@
 # SentiPiP 
 **(Sentiment Captions in picture in picture mode)**
 
-> ⚠️ **Disclaimer:** This README is AI-generated. The project itself was quickly crafted (vibecoded) during the **Software Mansion x Gemini** hackathon.
-
-A browser-based live subtitle application that streams audio via microphone to the Gemini Multimodal Live API for real-time translation and emotional tagging. Powered by the modern **gemini-3.1-flash-live-preview** model (as of 28.03.2026), it provides bilingual [PL+EN] Picture-in-Picture (PiP) subtitles and forwards emotional tone data to a local hardware companion device.
+A browser-based live subtitle application that streams audio via microphone to the Gemini Multimodal Live API for real-time translation and emotional tagging, it provides bilingual [PL+EN] Picture-in-Picture (PiP) subtitles and forwards emotional tone data to a local hardware companion device.
 
 ## Features
 - **Bilingual Subtitles:** Detects and translates audio to Polish and English simultaneously.
 - **Multilingual Speech Detection:** You can speak in any language or switch between multiple languages on the fly, and the system will automatically detect and translate them without requiring manual configuration.
 - **Dynamic PiP Display:** Shows subtitles in a floating Picture-in-Picture window, broken down into readable chunks for long sentences.
-- **Emotion & Tone Tagging:** The model attaches emotional metadata to the speech (e.g., `[Anger]`, `[Whispering]`, `[Slang]`).
+- **Emotion & Tone Tagging:** The model attaches emotional metadata to the speech (e.g., `[Anger]`, `[Amussed]`, `[Joyful]`).
 - **Lightning-Fast Response:** Leverages the Gemini Multimodal Live API via WebSocket to provide ultra-low latency, real-time feedback.
 - **Hardware Integration:** Forwards emotional tags to a local hardware device (like Ulzani TC 0001) for ambient LED color syncing.
 

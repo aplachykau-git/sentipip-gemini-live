@@ -68,23 +68,23 @@ let socket = null;
 let audioContext = null;
 let isStarted = false;
 
-// Chunk queue system for PiP
-let plChunks = [];
-let enChunks = [];
-let chunkIndex = 0;
-let chunkTimer = null;
-const CHUNK_DURATION_MS = 3000; // ms per chunk
+// ─── FIFO Sentence Queue for PiP ─────────────────────────────────────────────
+// Each item: { plChunks: string[], enChunks: string[] }
+let sentenceQueue = [];
+let isDisplayingSentence = false;
+const CHUNK_DURATION_MS = 3000; // ms per visual chunk
+const BETWEEN_SENTENCE_PAUSE_MS = 600; // pause between sentences
 
-// Displayed in PiP right now
+// Currently displayed in PiP
 let pipPlText = "";
 let pipEnText = "";
 
 /**
  * Split a long text string into an array of chunks that each fit within maxPx pixels.
- * ctx and font must already be set before calling.
+ * ctx.font must already be set before calling.
  */
 function splitIntoChunks(text, maxPx) {
-    if (!text || !text.trim()) return [];
+    if (!text || !text.trim()) return [''];
     const safe = text.replace(/[\r\n]+/g, ' ').trim();
     const words = safe.split(/\s+/);
     const chunks = [];
@@ -103,56 +103,71 @@ function splitIntoChunks(text, maxPx) {
 }
 
 /**
- * Rebuild chunk arrays from the latest full plText/enText and restart the queue timer.
+ * Add a completed sentence to the FIFO queue and kick off the display loop.
  */
-function rebuildAndScheduleChunks(plFull, enFull) {
+function enqueueSentence(plFull, enFull) {
+    if (!plFull && !enFull) return;
+
     const fontSize = 48;
     ctx.font = `bold ${fontSize}px sans-serif`;
-    const paddingH = 40;
-    const maxPx = canvas.width - (paddingH * 2) - 20;
+    const maxPx = canvas.width - 80; // 40px padding each side
 
-    const newPl = splitIntoChunks(plFull, maxPx);
-    const newEn = splitIntoChunks(enFull, maxPx);
-    const maxLen = Math.max(newPl.length, newEn.length, 1);
+    const plChunks = splitIntoChunks(plFull || '', maxPx);
+    const enChunks = splitIntoChunks(enFull || '', maxPx);
 
-    plChunks = newPl.concat(Array(maxLen - newPl.length).fill(""));
-    enChunks = newEn.concat(Array(maxLen - newEn.length).fill(""));
+    // Pair up chunks so pl[i] displays with en[i]
+    const len = Math.max(plChunks.length, enChunks.length);
+    while (plChunks.length < len) plChunks.push('');
+    while (enChunks.length < len) enChunks.push('');
 
-    if (chunkTimer === null) {
-        // No timer running — start fresh from the beginning
-        chunkIndex = 0;
-        pipPlText = plChunks[0] || "";
-        pipEnText = enChunks[0] || "";
-        chunkTimer = setInterval(advanceChunk, CHUNK_DURATION_MS);
-    }
-    // If timer IS running, the arrays have been silently updated.
-    // advanceChunk will naturally walk into the new entries on the next tick.
+    sentenceQueue.push({ plChunks, enChunks });
+    processSentenceQueue();
 }
 
-function advanceChunk() {
-    if (plChunks.length === 0 && enChunks.length === 0) return;
-    const total = Math.max(plChunks.length, enChunks.length, 1);
-    const nextIndex = chunkIndex + 1;
+/**
+ * Pick the next sentence from the queue and display its chunks sequentially.
+ * Calls itself after each sentence is done (with a short pause).
+ * Safe to call multiple times — guards with isDisplayingSentence.
+ */
+function processSentenceQueue() {
+    if (isDisplayingSentence || sentenceQueue.length === 0) return;
 
-    if (nextIndex >= total) {
-        // We've reached the last chunk — stop cycling and hold for 3s then clear
-        clearInterval(chunkTimer);
-        chunkTimer = null;
-        setTimeout(() => {
-            pipPlText = "";
-            pipEnText = "";
-        }, 3000);
-    } else {
-        chunkIndex = nextIndex;
-        pipPlText = plChunks[chunkIndex] || "";
-        pipEnText = enChunks[chunkIndex] || "";
+    isDisplayingSentence = true;
+    const { plChunks, enChunks } = sentenceQueue.shift();
+    let chunkIndex = 0;
+
+    function showChunk(index) {
+        pipPlText = plChunks[index] || '';
+        pipEnText = enChunks[index] || '';
+
+        if (index < plChunks.length - 1) {
+            // More chunks in this sentence — advance after CHUNK_DURATION_MS
+            setTimeout(() => showChunk(index + 1), CHUNK_DURATION_MS);
+        } else {
+            // Last chunk of this sentence — hold, then move to next sentence
+            setTimeout(() => {
+                // Clear screen briefly between sentences only if next sentence is waiting
+                if (sentenceQueue.length > 0) {
+                    pipPlText = '';
+                    pipEnText = '';
+                }
+                isDisplayingSentence = false;
+                if (sentenceQueue.length > 0) {
+                    setTimeout(processSentenceQueue, BETWEEN_SENTENCE_PAUSE_MS);
+                } else {
+                    // Nothing queued — hold last chunk visible, clear after 3s of silence
+                    setTimeout(() => {
+                        if (!isDisplayingSentence) {
+                            pipPlText = '';
+                            pipEnText = '';
+                        }
+                    }, 3000);
+                }
+            }, CHUNK_DURATION_MS);
+        }
     }
-}
 
-function stopChunkTimer() {
-    if (chunkTimer) { clearInterval(chunkTimer); chunkTimer = null; }
-    plChunks = []; enChunks = []; chunkIndex = 0;
-    pipPlText = ""; pipEnText = "";
+    showChunk(0);
 }
 
 /**
@@ -206,35 +221,16 @@ function drawCanvas() {
     const showPl = pipPlText || " ";
     const showEn = pipEnText || " ";
 
-    // 3. Calculate background box
-    const metricsPl = ctx.measureText(showPl);
-    const metricsEn = ctx.measureText(showEn);
-    const maxWidth = Math.max(metricsPl.width, metricsEn.width);
-
-    const boxWidth = maxWidth + (paddingH * 2);
-    const boxHeight = (fontSize * 2) + lineSpacing + (paddingV * 2);
-    const boxX = (canvas.width - boxWidth) / 2;
-    const boxY = (canvas.height - boxHeight) / 2;
+    const textStartY = (canvas.height - (fontSize * 2) - lineSpacing) / 2;
 
     try {
-        // 4. Draw the background box
-        ctx.fillStyle = isBlackTheme ? "#1c1c1e" : "black";
-        ctx.beginPath();
-        const safeRadius = Math.min(20, boxWidth / 2, boxHeight / 2);
-        ctx.roundRect(boxX, boxY, boxWidth, boxHeight, safeRadius);
-        ctx.fill();
+        // Polish — dark red on white theme, bright red on black theme
+        ctx.fillStyle = isBlackTheme ? "#FF2020" : "#8B0000";
+        ctx.fillText(showPl, canvas.width / 2, textStartY + (fontSize / 2));
 
-        // Colored border based on tag
-        ctx.strokeStyle = currentTagColor;
-        ctx.lineWidth = 4;
-        ctx.stroke();
-
-        // 5. Draw text — Polish (pale pink) on top, English (white) below
-        ctx.fillStyle = "#FFB6C1";
-        ctx.fillText(showPl, canvas.width / 2, boxY + paddingV + (fontSize / 2));
-
-        ctx.fillStyle = "white";
-        ctx.fillText(showEn, canvas.width / 2, boxY + paddingV + fontSize + lineSpacing + (fontSize / 2));
+        // English — black (light theme) / white (dark theme)
+        ctx.fillStyle = isBlackTheme ? "#ffffff" : "#000000";
+        ctx.fillText(showEn, canvas.width / 2, textStartY + fontSize + lineSpacing + (fontSize / 2));
     } catch (e) {
         console.error("Canvas draw error:", e);
     }
@@ -303,39 +299,52 @@ startBtn.onclick = async () => {
             if (outputTranscript?.text) {
                 currentText += outputTranscript.text;
 
-                // Strip ALL [Tag] patterns before displaying to the user
-                // We also replace the '|' delimiter with a newline so it displays on two lines in the main UI
-                let displayText = currentText.replace(/\[.*?\]/g, '').trim();
-                displayText = displayText.replace(/\s*\|\s*/g, '\n');
-                displayEl.innerText = displayText;
+                // Update main UI display with PiP-matching colors
+                // Wrapped in ONE outer span so the flex container keeps its original single-child layout
+                const rawClean = currentText.replace(/\[.*?\]/g, '').trim();
+                const rawParts = rawClean.split(/\||\n/);
+                const plText = rawParts[0]?.trim() || '';
+                const enText = rawParts.slice(1).join(' ').trim();
+                const isBlack = themeSelect && themeSelect.value === 'black';
+                const plColor = isBlack ? '#FF2020' : '#8B0000';
+                const inner = plText && enText
+                    ? `<span style="color:${plColor}">${plText}</span>\n${enText}`
+                    : plText
+                        ? `<span style="color:${plColor}">${plText}</span>`
+                        : enText;
+                displayEl.innerHTML = inner ? `<span>${inner}</span>` : '';
 
-                // Local device notification logic
                 const tagMatch = currentText.match(/\[(.*?)\]/);
-
-                // Clean text for PiP and chunks (don't collapse newlines entirely here)
                 const cleanText = currentText.replace(/\[.*?\]/g, '').trim();
 
-                // Extract Polish and English based on the '|' or newline delimiter if it missed the pipe
-                const parts = cleanText.split(/\||\n/);
-                const plFull = parts[0] ? parts[0].trim() : '';
-                const enFull = parts.slice(1).join(' ').trim();
+                // ── Determine if a sentence is ready to be enqueued ──────────
+                const hasPipe = cleanText.includes('|');
+                const isSentenceComplete = /[.!?]\s*$/.test(cleanText);
+                // New tag arrived while buffer had content → previous phrase ended
+                const newTagArrived = (currentText.match(/\[.*?\]/g) || []).length > 1;
+                // Safety fallback for very long uninterrupted speech
+                const isTooLong = cleanText.length > 400;
 
+                const shouldEnqueue = hasPipe && (isSentenceComplete || newTagArrived || isTooLong);
 
-                // Feed the chunk queue system for PiP
-                rebuildAndScheduleChunks(plFull, enFull);
+                if (shouldEnqueue) {
+                    const parts = cleanText.split(/\||\n/);
+                    const plFull = parts[0] ? parts[0].trim() : '';
+                    const enFull = parts.slice(1).join(' ').trim();
 
-                // We notify if we have a significant chunk of new text or a sentence end
-                const isSentenceComplete = /[.!?]$/.test(cleanText);
-                const isSubstantial = cleanText.length > 20 && cleanText.length % 40 === 0;
+                    enqueueSentence(plFull, enFull);
 
-                if (cleanText !== lastNotifiedText && (isSentenceComplete || isSubstantial)) {
+                    // Reset the accumulation buffer
+                    currentText = "";
+                    lastNotifiedText = "";
+                }
+
+                // ── Emotion tag & device notification ───────────────────────
+                if (cleanText !== lastNotifiedText && (isSentenceComplete || (cleanText.length > 20 && cleanText.length % 40 === 0))) {
                     const currentTag = tagMatch ? tagMatch[1] : 'Neutral';
-
-                    // Make lookup case-insensitive
                     const matchingKey = Object.keys(COLOR_MAP).find(k => k.toLowerCase() === currentTag.toLowerCase());
                     currentTagColor = matchingKey ? COLOR_MAP[matchingKey] : COLOR_MAP['Default'];
 
-                    // Update the main UI Emotion Tag
                     tagEl.innerText = `${currentTag}`;
                     tagEl.style.color = currentTagColor;
                     tagEl.style.borderColor = currentTagColor;
@@ -346,23 +355,21 @@ startBtn.onclick = async () => {
                     lastNotifiedText = cleanText;
                 }
 
-                // Clear text buffer after 4 seconds of inactivity.
-                // NOTE: do NOT stop the chunk queue here — let it finish cycling naturally.
+                // ── Clear main UI display after 4s of silence ────────────────
                 if (displayTimeout) clearTimeout(displayTimeout);
                 displayTimeout = setTimeout(() => {
+                    // If buffer still has something partial with a pipe, enqueue before clearing
+                    const partial = currentText.replace(/\[.*?\]/g, '').trim();
+                    if (partial.includes('|')) {
+                        const parts = partial.split(/\||\n/);
+                        enqueueSentence(parts[0]?.trim() || '', parts.slice(1).join(' ').trim());
+                    }
                     currentText = "";
-                    displayEl.innerText = "";
+                    displayEl.innerHTML = '';
                     tagEl.classList.remove('visible');
                     currentTagColor = '#007AFF';
                     lastNotifiedText = "";
                 }, 4000);
-
-                // Hard reset if buffer grows too large
-                if (currentText.length > 600) {
-                    currentText = "";
-                    lastNotifiedText = "";
-                    stopChunkTimer();
-                }
             }
         };
     } catch (e) {
